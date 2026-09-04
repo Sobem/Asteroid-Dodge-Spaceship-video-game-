@@ -1,0 +1,296 @@
+# Asteriod Dodge
+
+# The needed packages
+import pygame
+import random
+import sys
+
+pygame.mixer.pre_init(44100, -16, 2, 2048)
+pygame.init()
+
+WINDOW_WIDTH = 1200
+WINDOW_HEIGHT = 720
+screen = pygame.display.set_mode((WINDOW_WIDTH,WINDOW_HEIGHT))
+running = True
+ship_img = pygame.image.load("").convert_alpha()
+rock_img = pygame.image.load("").convert_alpha()
+laser_surf = pygame.image.load("").convert_alpha()
+boom_list = [pygame.image.load("").convert_alpha(),pygame.image.load("").convert_alpha(), pygame.image.load("").convert_alpha(), pygame.image.load("").convert_alpha(),pygame.image.load("").convert_alpha(),pygame.image.load("").convert_alpha(),pygame.image.load("").convert_alpha()]
+boom_frame = 0
+speed = 0.30
+
+pygame.mixer.music.load("")
+end = pygame.mixer.Sound("")
+end.set_volume(0.5)
+start = True
+
+
+
+while running:
+    if start == True: #Only runs at the beginning or after a restart
+        end.stop()
+        #pygame.mixer.music.play(-1)
+
+        # Resizes the images so their smaller
+        ship_surf = pygame.transform.scale_by(ship_img, 1)
+
+        #Picks a random scale value for the asteriods
+        scale1 = random.uniform(2.0, 5.0)
+        scale2 = random.uniform(2.0, 5.0)
+
+        #If 0 rock stops falling, if 1 falls
+        stop1 = 0
+        stop2 = 0
+
+        #Explosion effect
+        boom_x = -100
+        boom_y = -100
+
+        #Picks 2 different random x coordinates
+        rock_x = random.sample(range(0, 1201), 2)
+
+        #Two start times for the 2 different rocks
+        start_time1 = pygame.time.get_ticks()
+        start_time2 = pygame.time.get_ticks()
+
+        #A few vectors
+        vector_s = pygame.Vector2()
+        vector_r1 = pygame.Vector2(0,1)
+        vector_r2 = pygame.Vector2(0,1)
+        vector_l = pygame.Vector2(0,-400)
+        vector_s = pygame.Vector2(0,300) #The ship and stars share one vector (ship uses x while stars use y)
+
+        clock = pygame.time.Clock()
+
+        rock_surf1 = pygame.transform.scale_by(rock_img, scale1)
+        rock_surf2 = pygame.transform.scale_by(rock_img, scale2)
+        rock_rect1 = rock_surf1.get_rect(center = (rock_x[0],-100))
+        rock_rect2 = rock_surf2.get_rect(center = (rock_x[1],-100))
+        ship_rect = ship_surf.get_rect(center = (600,600))
+        laser_rect = laser_surf.get_rect(center = (-600,360))
+
+        # More variables...
+        volume = 0.5
+        score = 0
+        shot = 0
+        hit1 = 0
+        hit2 = 0
+        contact = 0
+        font = pygame.font.SysFont("Arial", 20)
+        text = ""
+        game_over = False
+
+
+        star_x = []
+        star_y = []
+
+        # Picks 100 random star coordinates
+        for i in range(100):
+            star_x.append(random.randint(0, 1200))
+            star_y.append(random.randint(0, 720))
+        
+        start = False
+    
+    restart = font.render(text, True, 'red')
+    pygame.mixer.music.set_volume(volume)
+    
+    ship_crect = pygame.Rect(ship_rect.left+25,ship_rect.top+20,ship_rect.width-50,ship_rect.height-150)
+    dt = clock.tick(60)/1000
+    keys = pygame.key.get_pressed()
+    
+    # Creates a "timer" (one for each asteriod)
+    current_time = pygame.time.get_ticks()
+    timer1 = (current_time - start_time1) / 1000
+    timer2 = (current_time - start_time2) / 1000
+    
+    
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            running = False
+            sys.exit()
+        if event.type == pygame.KEYDOWN:
+            # Pauses/unpauses the music
+            if event.key == pygame.K_p and pygame.mixer.music.get_busy() == True:
+                pygame.mixer.music.pause()
+            elif event.key == pygame.K_p and pygame.mixer.music.get_busy() == False:
+                pygame.mixer.music.unpause()
+                
+            elif event.key == pygame.K_SPACE and game_over == False: #Make the laser appear & trigger shot
+                laser_rect.centerx = ship_rect.centerx
+                laser_rect.centery = ship_rect.top - 25
+                shot = 1
+                
+            #Increase + decreases volume
+            elif event.key == pygame.K_UP:
+                volume += 0.1
+            elif event.key == pygame.K_DOWN:
+                volume -= 0.1
+            
+            #Restarts the game if R is pressed
+            elif event.key == pygame.K_r and game_over == True:
+                # Reset everything
+                end.stop()
+                start = True
+                game_over = False
+
+            
+    # Moves spaceship left/right (advanced techniques)        
+    if int(keys[pygame.K_RIGHT]) and ship_rect.right < 1200 and game_over == False:
+        vector_s.x = 400
+    elif int(keys[pygame.K_LEFT]) and ship_rect.left > 0 and game_over == False:
+        vector_s.x = -400
+    else:
+        vector_s.x = 0
+    ship_rect.centerx += vector_s.x * dt
+
+    
+    if shot == 1 and laser_rect.bottom > 0 and laser_rect.colliderect(rock_rect1)==False and laser_rect.colliderect(rock_rect2)==False:
+        #Laser moves up unless it's above the window or touching an asteriod
+        laser_rect.centery += vector_l.y * dt
+        
+    elif laser_rect.colliderect(rock_rect1):
+        #If laser touches asteriod disappear & tell the explosion where to appear
+        hit1 = 1
+        contact = 1
+        boom_x = rock_rect1.centerx-75
+        boom_y = rock_rect1.centery-50
+        laser_rect.center = (-600,600)
+        
+    elif laser_rect.colliderect(rock_rect2):
+        hit2 = 1
+        contact = 1
+        boom_x = rock_rect2.centerx-75
+        boom_y = rock_rect2.centery-50
+        laser_rect.center = (-600,600)
+    elif laser_rect.bottom > 0:
+        laser_rect.center = (-600,600)
+    
+    # Names the game "Asteriod dodge" + makes the background black
+    pygame.display.set_caption('Asteroid Dodge')
+    screen.fill('black')
+    
+    # Handles the scenario where ship + asteriod collide
+    if (ship_crect.colliderect(rock_rect1) or ship_crect.colliderect(rock_rect2)) and game_over == False:
+        pygame.mixer.music.stop()
+        end.play()
+        text = "Do you wish to play again? (If yes type R)"
+        stop1  = 0
+        stop2 = 0
+        print("GAME ENDED")
+        print(f"Score: {score}")
+        game_over = True
+    
+    #Randomly changes rock's speed
+    if timer1 >= 1.5 and stop1 == 0:
+        vector_r1.y = random.randint(200,500)
+        stop1 = 1
+        
+    if timer1 >= 1.5 and game_over == False:
+        rock_rect1.centery += vector_r1.y * dt
+    
+    if timer2 >= 1.5 and stop2 == 0:
+        vector_r2.y = random.randint(200,500)
+        stop2 = 1
+        
+    if timer2 >= 1.5 and game_over == False:
+        rock_rect2.centery += vector_r2.y * dt
+    
+    
+    if rock_rect1.centery > 720 or hit1 == 1:
+        stop1 = 0
+        score += 1
+        rock_x1 = random.randint(0,1200)
+        scale1 = random.uniform(2.0, 5.0)
+        rock_surf1 = pygame.transform.scale_by(rock_img, scale1)
+        rock_rect1 = rock_surf1.get_rect(center = (rock_x1,-100))
+        hit1 = 0
+        start_time1 = pygame.time.get_ticks()
+        
+    if rock_rect2.centery > 720 or hit2 == 1:
+        stop2 = 0
+        score += 1
+        rock_x2 = random.randint(0,1200)
+        scale2 = random.uniform(2.0, 5.0)
+        rock_surf2 = pygame.transform.scale_by(rock_img, scale2)
+        rock_rect2 = rock_surf2.get_rect(center = (rock_x2,-100))
+        hit2 = 0
+        start_time2 = pygame.time.get_ticks()
+
+    
+    if contact == 1:
+        if boom_frame >= len(boom_list):
+                boom_frame = 0
+                contact = 0
+        else:
+            boom_frame += speed
+                
+    if contact == 0:
+        boom_pt = (-100,-100)
+    
+    for i in range(100):
+        if game_over == False:
+            #Makes the current star drift downwards
+            star_y[i] += vector_s.y * dt
+        if star_y[i] > 720:
+            #If current star falls below the screen reappear at the top (new random coordinates)
+            star_y[i] = random.randint(-600,0) #Ensures the stars don't all reappear in a line but rather staggered
+            star_x[i] = random.randint(0, 1200)
+        pygame.draw.circle(screen, 'white', (star_x[i], star_y[i]), 2)
+        
+
+ 
+    
+    #pygame.draw.rect(screen, 'red', rock_rect, width=1, border_radius=0)
+    score_surf = font.render(f"Score: {score} pts", True, 'blue')
+    if contact == 1 and int(boom_frame) < len(boom_list):
+        screen.blit(boom_list[int(boom_frame)], (boom_x,boom_y))
+        
+    screen.blit(score_surf, (10,10))
+    screen.blit(ship_surf, ship_rect)
+    screen.blit(rock_surf1, rock_rect1)
+    screen.blit(rock_surf2, rock_rect2)
+    screen.blit(laser_surf, laser_rect)
+    screen.blit(restart, (450,60))
+    pygame.display.update()
+
+    pygame.draw.rect(screen,'red',laser_rect,width=1)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
